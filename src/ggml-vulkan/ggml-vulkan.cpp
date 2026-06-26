@@ -376,6 +376,12 @@ static vk_device_architecture get_device_architecture(const vk::PhysicalDevice& 
             return vk_device_architecture::OTHER;
         }
 
+        // Arrow Lake Arc 140T (0x7d51): Windows driver reports minSubgroupSize=8.
+        // Force Xe2-class paths where coopmat is validated. Refs ggml-org#20776
+        if (props.deviceID == 0x7d51) {
+            return vk_device_architecture::INTEL_XE2;
+        }
+
         vk::PhysicalDeviceProperties2 props2;
         vk::PhysicalDeviceSubgroupSizeControlPropertiesEXT subgroup_size_control_props;
 
@@ -6202,6 +6208,13 @@ static vk_device ggml_vk_get_device(size_t idx) {
             }
         }
 
+        if (device->vendor_id == VK_VENDOR_ID_INTEL &&
+            device->architecture == vk_device_architecture::INTEL_XE2 &&
+            !device->coopmat_support) {
+            device->architecture = vk_device_architecture::OTHER;
+            GGML_LOG_INFO("ggml_vulkan: Intel SIMD16 GPU without coopmat: using pre-Xe2 Vulkan paths\n");
+        }
+
         if (device->coopmat_support) {
             device_extensions.push_back("VK_KHR_cooperative_matrix");
         }
@@ -6287,6 +6300,21 @@ static vk_device ggml_vk_get_device(size_t idx) {
             device->mul_mat_id_l_int[i] = device->mul_mat_id_l[i];
             device->mul_mat_id_m_int[i] = device->mul_mat_id_m[i];
             device->mul_mat_id_s_int[i] = device->mul_mat_id_s[i];
+        }
+
+        if (getenv("GGML_VK_DEVICE_DEBUG") != nullptr && device->vendor_id == VK_VENDOR_ID_INTEL) {
+            const char * arch_name = "OTHER";
+            switch (device->architecture) {
+            case vk_device_architecture::INTEL_XE2: arch_name = "INTEL_XE2"; break;
+            default: break;
+            }
+            GGML_LOG_INFO("ggml_vulkan: Intel device debug: arch=%s coopmat=%d mul_mat_l[Q8_0]=%d mul_mat_m=%d mul_mat_s=%d FA_mult=%u\n",
+                arch_name,
+                (int) device->coopmat_support,
+                (int) device->mul_mat_l[GGML_TYPE_Q8_0],
+                (int) device->mul_mat_m[GGML_TYPE_Q8_0],
+                (int) device->mul_mat_s[GGML_TYPE_Q8_0],
+                (device->architecture == vk_device_architecture::INTEL_XE2) ? 1u : 2u);
         }
 
 
@@ -17651,6 +17679,8 @@ static uint32_t ggml_vk_intel_shader_core_count(const vk::PhysicalDevice& vkdev)
     case 0xE20B:  // B580
     case 0xE211:  // Pro B60
         return 20;
+    case 0x7d51:  // Arrow Lake Arc 140T iGPU
+        return 16;
     default:
         return 0;
     }
