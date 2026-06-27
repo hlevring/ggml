@@ -170,6 +170,16 @@ enum ggml_status ov_graph_compute_dynamic(ggml_cgraph * cgraph, std::shared_ptr<
     const auto & stateful = r_ctx->stateful;
     static auto is_static = false;
 
+    // GGML_OPENVINO_FORCE_NAIVE: route every subgraph through the generic
+    // op-by-op translator (naive=true), which does NOT run compute_llm_params'
+    // KV-cache attention parser. Needed for cache-less / non-causal graphs like
+    // OmniVoice MaskGIT, whose attention (K = permute(rope(...)), no cache_k
+    // view) is not recognized by get_attention_pattern_case and is otherwise
+    // mistranslated. Slower (no infer-request cache on this path) but correct.
+    static const bool force_naive = ggml_openvino_getenv_int("GGML_OPENVINO_FORCE_NAIVE");
+    if (force_naive) {
+        return naive_compute(cgraph, core, device, config);
+    }
     if (is_naive(cgraph)) {
         if (!is_model_splitted(cgraph)) {
             return naive_compute(cgraph, core, device, config);
@@ -232,9 +242,16 @@ enum ggml_status ov_graph_compute_dynamic(ggml_cgraph * cgraph, std::shared_ptr<
             std::map<std::string, std::shared_ptr<ov::Node>> model_weights;
             ggml_decoder->set_compute_params(c_params);
             ggml_decoder->set_model_params(m_params);
-            if (old_m_params.kv_buffer_changed(m_params)) {
-                ggml_decoder->update_io(cgraph);
-            }
+            // The cached decoder still points at the PREVIOUS step's cgraph
+            // tensors. A graph that rebuilds and frees its context every step
+            // (OmniVoice MaskGIT: no KV cache, so kv_buffer_changed() is false)
+            // would otherwise reuse freed tensor pointers on the next compute —
+            // surfacing as a GPU "Mismatch tensor and port type: i32 vs f32" or
+            // an access violation. Rebind the decoder's I/O to the current
+            // cgraph unconditionally. For the llama.cpp KV-cache path
+            // kv_buffer_changed() is true every decode, so update_io() was
+            // already running there; making it unconditional is a no-op for it.
+            ggml_decoder->update_io(cgraph);
             ggml_decoder->add_extra_inputs();
             {
                 std::lock_guard<std::mutex> map_lock(r_ctx->ctx_mutex);

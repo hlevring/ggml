@@ -228,6 +228,7 @@ std::shared_ptr<Model> TranslateSession::translate_graph(const frontend::InputMo
                                 "Output name not found in tensor map: ", name);
         auto result = std::make_shared<v0::Result>(tensor_map->at(name));
         result->set_friendly_name(name);
+        result->get_output_tensor(0).set_names({name});
         results.push_back(result);
     }
 
