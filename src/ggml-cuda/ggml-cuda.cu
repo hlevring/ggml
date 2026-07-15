@@ -5399,6 +5399,7 @@ static bool ggml_backend_cuda_device_supports_op(ggml_backend_dev_t dev, const g
             return op->src[0]->nb[0] == ggml_type_size(op->src[0]->type) && ggml_is_contiguous_2(op->src[0]);
         }
         case GGML_OP_IM2COL:
+            return op->src[1]->type == GGML_TYPE_F32 || op->src[1]->type == GGML_TYPE_F16;
         case GGML_OP_IM2COL_3D:
         case GGML_OP_CONV_2D:
         case GGML_OP_CONV_2D_DW:
