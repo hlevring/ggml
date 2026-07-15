@@ -1198,6 +1198,10 @@ template [[host_name("kernel_unary_f32_f32")]]   kernel kernel_unary_t kernel_un
 template [[host_name("kernel_unary_f32_f32_4")]] kernel kernel_unary_t kernel_unary_impl<float4, float4, float4>;
 template [[host_name("kernel_unary_f16_f16")]]   kernel kernel_unary_t kernel_unary_impl<half,   half,   float>;
 template [[host_name("kernel_unary_f16_f16_4")]] kernel kernel_unary_t kernel_unary_impl<half4,  half4,  float4>;
+#if defined(GGML_METAL_HAS_BF16)
+template [[host_name("kernel_unary_bf16_bf16")]]   kernel kernel_unary_t kernel_unary_impl<bfloat,  bfloat,  float>;
+template [[host_name("kernel_unary_bf16_bf16_4")]] kernel kernel_unary_t kernel_unary_impl<bfloat4, bfloat4, float4>;
+#endif
 
 // OP: 0 - add, 1 - sub, 2 - mul, 3 - div
 constant short FC_bin_op [[function_constant(FC_BIN + 0)]];
@@ -1366,6 +1370,12 @@ template [[host_name("kernel_bin_fuse_f16_f16_f16")]]   kernel kernel_bin_fuse_t
 template [[host_name("kernel_bin_fuse_f16_f16_f16_4")]] kernel kernel_bin_fuse_t kernel_bin_fuse_impl<half4,  half4,  half4,  float4>;
 template [[host_name("kernel_bin_fuse_f16_f32_f16")]]   kernel kernel_bin_fuse_t kernel_bin_fuse_impl<half,   float,  half,   float>;
 template [[host_name("kernel_bin_fuse_f16_f32_f16_4")]] kernel kernel_bin_fuse_t kernel_bin_fuse_impl<half4,  float4, half4,  float4>;
+#if defined(GGML_METAL_HAS_BF16)
+template [[host_name("kernel_bin_fuse_bf16_bf16_bf16")]]   kernel kernel_bin_fuse_t kernel_bin_fuse_impl<bfloat,  bfloat,  bfloat,  float>;
+template [[host_name("kernel_bin_fuse_bf16_bf16_bf16_4")]] kernel kernel_bin_fuse_t kernel_bin_fuse_impl<bfloat4, bfloat4, bfloat4, float4>;
+template [[host_name("kernel_bin_fuse_bf16_f32_bf16")]]    kernel kernel_bin_fuse_t kernel_bin_fuse_impl<bfloat,  float,   bfloat,  float>;
+template [[host_name("kernel_bin_fuse_bf16_f32_bf16_4")]]  kernel kernel_bin_fuse_t kernel_bin_fuse_impl<bfloat4, float4,  bfloat4, float4>;
+#endif
 
 kernel void kernel_add_id(
         constant ggml_metal_kargs_add_id & args,

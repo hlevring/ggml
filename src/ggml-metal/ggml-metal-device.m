@@ -1074,7 +1074,7 @@ bool ggml_metal_device_supports_op(ggml_metal_device_t dev, const struct ggml_te
         case GGML_OP_SIN:
         case GGML_OP_COS:
         case GGML_OP_LOG:
-            return ggml_is_contiguous_rows(op->src[0]) && (op->src[0]->type == GGML_TYPE_F32 || op->src[0]->type == GGML_TYPE_F16);
+            return ggml_is_contiguous_rows(op->src[0]) && (op->src[0]->type == GGML_TYPE_F32 || op->src[0]->type == GGML_TYPE_F16 || op->src[0]->type == GGML_TYPE_BF16);
         case GGML_OP_UNARY:
             switch (ggml_get_unary_op(op)) {
                 case GGML_UNARY_OP_TANH:
@@ -1149,12 +1149,15 @@ bool ggml_metal_device_supports_op(ggml_metal_device_t dev, const struct ggml_te
             if (!ggml_is_contiguous_rows(op->src[0]) || !ggml_is_contiguous_rows(op->src[1])) {
                 return false;
             }
-            // gate on the instantiated kernel_bin_fuse combos: f32_f32_f32, f16_f16_f16, f16_f32_f16
+            // gate on the instantiated kernel_bin_fuse combos, per src0 type:
+            // f32_f32_f32, f16_f16_f16, f16_f32_f16, bf16_bf16_bf16, bf16_f32_bf16
             switch (op->src[0]->type) {
                 case GGML_TYPE_F32:
                     return op->src[1]->type == GGML_TYPE_F32 && op->type == GGML_TYPE_F32;
                 case GGML_TYPE_F16:
                     return (op->src[1]->type == GGML_TYPE_F16 || op->src[1]->type == GGML_TYPE_F32) && op->type == GGML_TYPE_F16;
+                case GGML_TYPE_BF16:
+                    return (op->src[1]->type == GGML_TYPE_BF16 || op->src[1]->type == GGML_TYPE_F32) && op->type == GGML_TYPE_BF16;
                 default:
                     return false;
             }
