@@ -1752,7 +1752,7 @@ ggml_metal_pipeline_with_params ggml_metal_library_get_pipeline_im2col(ggml_meta
     GGML_TENSOR_LOCALS(int64_t, ne0, op->src[0], ne);
 
     GGML_ASSERT(ggml_is_contiguous(op->src[1]));
-    GGML_ASSERT(op->src[1]->type == GGML_TYPE_F32);
+    GGML_ASSERT(op->src[1]->type == GGML_TYPE_F32 || op->src[1]->type == GGML_TYPE_F16);
     GGML_ASSERT(op->type         == GGML_TYPE_F16 || op->type == GGML_TYPE_F32);
 
     const bool is_2D = ((const int32_t *)(op->op_params))[6] == 1;
@@ -1763,9 +1763,9 @@ ggml_metal_pipeline_with_params ggml_metal_library_get_pipeline_im2col(ggml_meta
     char name[256];
 
     if (KH*KW <= 1024) {
-        snprintf(base, 256, "kernel_im2col_%s", ggml_type_name(op->type));
+        snprintf(base, 256, "kernel_im2col_%s_%s", ggml_type_name(op->src[1]->type), ggml_type_name(op->type));
     } else {
-        snprintf(base, 256, "kernel_im2col_ext_%s", ggml_type_name(op->type));
+        snprintf(base, 256, "kernel_im2col_ext_%s_%s", ggml_type_name(op->src[1]->type), ggml_type_name(op->type));
     }
     snprintf(name, 256, "%s", base);
 

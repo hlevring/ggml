@@ -4690,17 +4690,17 @@ template [[host_name("kernel_rope_vision_f16")]] kernel kernel_rope_vision_t ker
 
 typedef void (im2col_t)(
         constant ggml_metal_kargs_im2col & args,
-        device const float * x,
+        device const char * x,
         device        char * dst,
         uint3 tgpig[[threadgroup_position_in_grid]],
         uint3  tgpg[[threadgroups_per_grid]],
         uint3 tpitg[[thread_position_in_threadgroup]],
         uint3   ntg[[threads_per_threadgroup]]);
 
-template <typename T>
+template <typename TS, typename T>
 kernel void kernel_im2col(
         constant ggml_metal_kargs_im2col & args,
-        device const float * x,
+        device const char * x,
         device        char * dst,
         uint3 tgpig[[threadgroup_position_in_grid]],
         uint3  tgpg[[threadgroups_per_grid]],
@@ -4726,7 +4726,8 @@ kernel void kernel_im2col(
 
     int64_t offset_dst = (in*OH*OW + ioh*OW + iow)*args.CHW + (iic*(KH*KW) + ikh*KW + ikw);
 
-    device T * pdst = (device T *) (dst);
+    device const TS * psrc = (device const TS *) (x);
+    device       T  * pdst = (device       T  *) (dst);
 
     if (iih < 0 || iih >= args.IH || iiw < 0 || iiw >= args.IW) {
         while (in < args.N) {
@@ -4739,7 +4740,7 @@ kernel void kernel_im2col(
         int64_t offset_src = in*args.ofs0 + iic*args.ofs1 + iih*args.IW + iiw;
 
         while (in < args.N) {
-            pdst[offset_dst] = x[offset_src];
+            pdst[offset_dst] = psrc[offset_src];
 
             offset_dst += ntg[0]*args.CHW*OH*OW;
             offset_src += ntg[0]*args.ofs0;
@@ -4749,23 +4750,25 @@ kernel void kernel_im2col(
     }
 }
 
-template [[host_name("kernel_im2col_f32")]] kernel im2col_t kernel_im2col<float>;
-template [[host_name("kernel_im2col_f16")]] kernel im2col_t kernel_im2col<half>;
+template [[host_name("kernel_im2col_f32_f32")]] kernel im2col_t kernel_im2col<float, float>;
+template [[host_name("kernel_im2col_f32_f16")]] kernel im2col_t kernel_im2col<float, half>;
+template [[host_name("kernel_im2col_f16_f32")]] kernel im2col_t kernel_im2col<half,  float>;
+template [[host_name("kernel_im2col_f16_f16")]] kernel im2col_t kernel_im2col<half,  half>;
 
 // TODO: optimize
 typedef void (im2col_ext_t)(
         constant ggml_metal_kargs_im2col & args,
-        device const float * x,
+        device const char * x,
         device        char * dst,
         uint3 tgpig[[threadgroup_position_in_grid]],
         uint3  tgpg[[threadgroups_per_grid]],
         uint3 tpitg[[thread_position_in_threadgroup]],
         uint3   ntg[[threads_per_threadgroup]]);
 
-template <typename T>
+template <typename TS, typename T>
 kernel void kernel_im2col_ext(
         constant ggml_metal_kargs_im2col & args,
-        device const float * x,
+        device const char * x,
         device        char * dst,
         uint3 tgpig[[threadgroup_position_in_grid]],
         uint3  tgpg[[threadgroups_per_grid]],      // tgpg[0] = D x IC x KH x KW, CHW = IC x KH x KW
@@ -4793,18 +4796,21 @@ kernel void kernel_im2col_ext(
         (tpitg_0 * tgpg[1] * tgpg[2] + tgpig[1] * tgpg[2] + tgpig[2]) * args.CHW +
         (tgpig_0 * KHW + tpitg_1 * args.KW + tpitg_2);
 
-    device T * pdst = (device T *) (dst);
+    device const TS * psrc = (device const TS *) (x);
+    device       T  * pdst = (device       T  *) (dst);
 
     if (iih < 0 || iih >= args.IH || iiw < 0 || iiw >= args.IW) {
         pdst[offset_dst] = 0.0f;
     } else {
         const int64_t offset_src = tpitg_0 * args.ofs0 + tgpig_0 * args.ofs1;
-        pdst[offset_dst] = x[offset_src + iih * args.IW + iiw];
+        pdst[offset_dst] = psrc[offset_src + iih * args.IW + iiw];
     }
 }
 
-template [[host_name("kernel_im2col_ext_f32")]] kernel im2col_ext_t kernel_im2col_ext<float>;
-template [[host_name("kernel_im2col_ext_f16")]] kernel im2col_ext_t kernel_im2col_ext<half>;
+template [[host_name("kernel_im2col_ext_f32_f32")]] kernel im2col_ext_t kernel_im2col_ext<float, float>;
+template [[host_name("kernel_im2col_ext_f32_f16")]] kernel im2col_ext_t kernel_im2col_ext<float, half>;
+template [[host_name("kernel_im2col_ext_f16_f32")]] kernel im2col_ext_t kernel_im2col_ext<half,  float>;
+template [[host_name("kernel_im2col_ext_f16_f16")]] kernel im2col_ext_t kernel_im2col_ext<half,  half>;
 
 template <typename TK>
 kernel void kernel_conv_2d(

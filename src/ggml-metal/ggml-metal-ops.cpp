@@ -3668,8 +3668,8 @@ int ggml_metal_op_im2col(ggml_metal_op_t ctx, int idx) {
 
     const int32_t CHW = IC * KH * KW;
 
-    const uint64_t ofs0 = op->src[1]->nb[is_2D ? 3 : 2] / 4;
-    const uint64_t ofs1 = op->src[1]->nb[is_2D ? 2 : 1] / 4;
+    const uint64_t ofs0 = op->src[1]->nb[is_2D ? 3 : 2] / ggml_type_size(op->src[1]->type);
+    const uint64_t ofs1 = op->src[1]->nb[is_2D ? 2 : 1] / ggml_type_size(op->src[1]->type);
 
     ggml_metal_kargs_im2col args = {
         /*.ofs0 =*/ ofs0,
