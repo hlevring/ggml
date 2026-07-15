@@ -1146,6 +1146,18 @@ bool ggml_metal_device_supports_op(ggml_metal_device_t dev, const struct ggml_te
         case GGML_OP_SUB:
         case GGML_OP_MUL:
         case GGML_OP_DIV:
+            if (!ggml_is_contiguous_rows(op->src[0]) || !ggml_is_contiguous_rows(op->src[1])) {
+                return false;
+            }
+            // gate on the instantiated kernel_bin_fuse combos: f32_f32_f32, f16_f16_f16, f16_f32_f16
+            switch (op->src[0]->type) {
+                case GGML_TYPE_F32:
+                    return op->src[1]->type == GGML_TYPE_F32 && op->type == GGML_TYPE_F32;
+                case GGML_TYPE_F16:
+                    return (op->src[1]->type == GGML_TYPE_F16 || op->src[1]->type == GGML_TYPE_F32) && op->type == GGML_TYPE_F16;
+                default:
+                    return false;
+            }
         case GGML_OP_ADD_ID:
         case GGML_OP_ACC:
             return ggml_is_contiguous_rows(op->src[0]) && ggml_is_contiguous_rows(op->src[1]) && op->src[0]->type == GGML_TYPE_F32;
