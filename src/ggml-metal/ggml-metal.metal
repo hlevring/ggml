@@ -5501,6 +5501,8 @@ typedef decltype(kernel_pad_impl<float>) kernel_pad_t;
 
 template [[host_name("kernel_pad_f32")]]   kernel kernel_pad_t kernel_pad_impl<float>;
 template [[host_name("kernel_pad_f32_4")]] kernel kernel_pad_t kernel_pad_impl<float4>;
+template [[host_name("kernel_pad_f16")]]   kernel kernel_pad_t kernel_pad_impl<half>;
+template [[host_name("kernel_pad_f16_4")]] kernel kernel_pad_t kernel_pad_impl<half4>;
 
 // TODO: this is slow - optimize
 kernel void kernel_pad_reflect_1d_f32(
