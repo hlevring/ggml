@@ -92,9 +92,9 @@ void im2col(const uint ow, const uint z_idx) {
             const int iiw = base_iw + int(kx * p.d0);
             const int iih = base_ih + int(ky * p.d1);
 
-            A_TYPE val = A_TYPE(0);
+            float val = 0.0f;
             if (uint(iih) < p.IH && uint(iiw) < p.IW) {
-                val = data_a[ic_offset + uint(iih) * p.IW + uint(iiw)];
+                val = float(data_a[ic_offset + uint(iih) * p.IW + uint(iiw)]);
             }
 
 #if BDA

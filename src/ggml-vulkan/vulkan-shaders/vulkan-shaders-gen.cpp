@@ -1002,6 +1002,10 @@ void process_shaders() {
             std::string bda_def = bda ? "1" : "0";
             string_to_spv("im2col" + dim_str + "_f32" + bda_str, "im2col" + dim_str + ".comp", merge_maps(base_dict, {{"A_TYPE", "float"}, {"D_TYPE", "float"}, {"D_SIZE", "4"}, {"BDA", bda_def}}));
             string_to_spv("im2col" + dim_str + "_f32_f16" + bda_str, "im2col" + dim_str + ".comp", merge_maps(base_dict, {{"A_TYPE", "float"}, {"D_TYPE", "float16_t"}, {"D_SIZE", "2"}, {"BDA", bda_def}}));
+            if (dim_str.empty()) {
+                string_to_spv("im2col_f16" + bda_str, "im2col.comp", merge_maps(base_dict, {{"A_TYPE", "float16_t"}, {"D_TYPE", "float16_t"}, {"D_SIZE", "2"}, {"BDA", bda_def}}));
+                string_to_spv("im2col_f16_f32" + bda_str, "im2col.comp", merge_maps(base_dict, {{"A_TYPE", "float16_t"}, {"D_TYPE", "float"}, {"D_SIZE", "4"}, {"BDA", bda_def}}));
+            }
         }
     }
 
