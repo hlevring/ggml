@@ -2210,23 +2210,34 @@ struct test_get_rows : public test_case {
     const int be1; // batch size
     const int be2; // batch size
     const bool v; // view (non-contiguous src1)
+    const bool misalign_rows; // nonzero view_offs on i32 rows (SSBO misalign)
 
     std::string vars() override {
-        return VARS_TO_STR7(type, n, m, r, be1, be2, v);
+        return VARS_TO_STR8(type, n, m, r, be1, be2, v, misalign_rows);
     }
 
-    test_get_rows(ggml_type type = GGML_TYPE_F32, int n = 10, int m = 5, int r = 3, int be1 = 1, int be2 = 1, bool v = false)
-        : type(type), n(n), m(m), r(r), be1(be1), be2(be2), v(v) {}
+    test_get_rows(ggml_type type = GGML_TYPE_F32, int n = 10, int m = 5, int r = 3, int be1 = 1, int be2 = 1, bool v = false, bool misalign_rows = false)
+        : type(type), n(n), m(m), r(r), be1(be1), be2(be2), v(v), misalign_rows(misalign_rows) {}
 
     ggml_tensor * build_graph(ggml_context * ctx) override {
         ggml_tensor * in = ggml_new_tensor_4d(ctx, type, n, m, be1, be2);
         ggml_set_name(in, "in");
 
-        ggml_tensor * rows = ggml_new_tensor_3d(ctx, GGML_TYPE_I32, r, be1, be2);
-        ggml_set_name(rows, "rows");
-        if (v) {
-            rows = ggml_view_3d(ctx, rows, r/2, be1, be2, rows->nb[1], rows->nb[2], 0);
+        ggml_tensor * rows;
+        if (misalign_rows) {
+            // Pad dim0 by 1 and view at sizeof(int32_t) so view_offs is often
+            // not a multiple of minStorageBufferOffsetAlignment (Vulkan path).
+            rows = ggml_new_tensor_3d(ctx, GGML_TYPE_I32, r + 1, be1, be2);
+            ggml_set_name(rows, "rows");
+            rows = ggml_view_3d(ctx, rows, r, be1, be2, rows->nb[1], rows->nb[2], sizeof(int32_t));
             ggml_set_name(rows, "view_of_rows");
+        } else {
+            rows = ggml_new_tensor_3d(ctx, GGML_TYPE_I32, r, be1, be2);
+            ggml_set_name(rows, "rows");
+            if (v) {
+                rows = ggml_view_3d(ctx, rows, r/2, be1, be2, rows->nb[1], rows->nb[2], 0);
+                ggml_set_name(rows, "view_of_rows");
+            }
         }
 
         const bool grad_supported = ggml_is_matrix(in) && ggml_is_vector(rows);
@@ -2245,12 +2256,13 @@ struct test_get_rows : public test_case {
         for (ggml_tensor * t = ggml_get_first_tensor(ctx); t != NULL; t = ggml_get_next_tensor(ctx, t)) {
             if (t->type == GGML_TYPE_I32) {
                 if (ggml_is_view_op(t->op)) { continue; }
-                // rows
-                std::vector<int> data(r*be1*be2);
-                for (int i = 0; i < r*be1*be2; i++) {
+                // rows (backing buffer; larger when misalign_rows pads dim0)
+                const int n_el = (int) ggml_nelements(t);
+                std::vector<int> data(n_el);
+                for (int i = 0; i < n_el; i++) {
                     data[i] = rand() % m;
                 }
-                ggml_backend_tensor_set(t, data.data(), 0, r * be1 * be2 * sizeof(int));
+                ggml_backend_tensor_set(t, data.data(), 0, n_el * sizeof(int));
             } else {
                 init_tensor_uniform(t);
             }
@@ -7722,6 +7734,12 @@ static std::vector<std::unique_ptr<test_case>> make_test_cases_eval() {
             test_cases.emplace_back(new test_get_rows(GGML_TYPE_I32, 256, 5, 4, b, 1, v));
         }
     }
+
+    // Misaligned i32 row-index views (nonzero view_offs) — exercises Vulkan
+    // GET_ROWS pushconst offsets with Q8_0 weights (src0 stays aligned).
+    test_cases.emplace_back(new test_get_rows(GGML_TYPE_Q8_0, 256, 5, 4, 1, 1, false, true));
+    test_cases.emplace_back(new test_get_rows(GGML_TYPE_F32,  256, 5, 4, 1, 1, false, true));
+    test_cases.emplace_back(new test_get_rows(GGML_TYPE_Q8_0, 256, 5, 4, 7, 1, false, true));
 
     test_cases.emplace_back(new test_get_rows_back(GGML_TYPE_F32, 1, 8, 2, 1, false));
     for (ggml_type type : all_types) {
