@@ -11022,10 +11022,11 @@ template <> void init_pushconst_tensor_offsets(ggml_backend_vk_context * ctx, vk
     const uint32_t b_offset = get_misalign_bytes(ctx, src1) / ggml_type_size(src1->type);
     const uint32_t d_offset = get_misalign_bytes(ctx, dst) / ggml_type_size(dst->type);
 
-    // GET_ROWS (and other binary-pushconst ops) consume misalign_offsets in
-    // get_rows.comp via get_aoffset/get_boffset/get_doffset. Do not require
-    // zero offsets: static batched graphs (e.g. OmniVoice MaskGIT) legitimately
-    // place GET_ROWS on views with non-zero storage-buffer misalignment.
+    // GET_ROWS: i32 rows (b) and f32 dst (d) may be SSBO-misaligned; pushconst
+    // offsets (get_boffset/get_doffset) handle them. Quantized src0 (a) must
+    // stay aligned. a_offset is a block index and misalign_bytes/type_size
+    // truncates if not a whole block.
+    GGML_ASSERT(dst->op != GGML_OP_GET_ROWS || !ggml_is_quantized(src0->type) || a_offset == 0);
 
     p.misalign_offsets = (a_offset << 16) | (b_offset << 8) | d_offset;
 
